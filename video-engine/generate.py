@@ -38,70 +38,72 @@ class VideoGenerator:
         """Execute the full pipeline: script → images → TTS → captions → compose."""
         # 1. Load video plan from DB
         conn = sqlite3.connect(self.db_path)
-        row = conn.execute(
-            f"SELECT {', '.join(VIDEO_COLUMNS)} FROM videos WHERE id = ?",
-            (self.video_id,),
-        ).fetchone()
-        if row is None:
-            raise ValueError(f"Video {self.video_id} not found in database")
-        video = dict(zip(VIDEO_COLUMNS, row))
+        try:
+            row = conn.execute(
+                f"SELECT {', '.join(VIDEO_COLUMNS)} FROM videos WHERE id = ?",
+                (self.video_id,),
+            ).fetchone()
+            if row is None:
+                raise ValueError(f"Video {self.video_id} not found in database")
+            video = dict(zip(VIDEO_COLUMNS, row))
 
-        # 2. Generate script
-        writer = ScriptWriter(self.ollama_host, self.ollama_model)
-        script_data = writer.generate(video["title"], video["hook"], video["niche"])
-        narration = script_data["narration"]
-        scenes = script_data["scenes"]
+            # 2. Generate script
+            writer = ScriptWriter(self.ollama_host, self.ollama_model)
+            script_data = writer.generate(video["title"], video["hook"], video["niche"])
+            narration = script_data["narration"]
+            scenes = script_data["scenes"]
 
-        # 3. Update status to "scripted", save narration
-        conn.execute(
-            "UPDATE videos SET status = ?, script = ? WHERE id = ?",
-            ("scripted", narration, self.video_id),
-        )
-        conn.commit()
+            # 3. Update status to "scripted", save narration
+            conn.execute(
+                "UPDATE videos SET status = ?, script = ? WHERE id = ?",
+                ("scripted", narration, self.video_id),
+            )
+            conn.commit()
 
-        # 4. Generate images
-        img_gen = ImageGenerator(os.path.join(self.work_dir, "images"))
-        image_paths = img_gen.generate_batch(scenes)
+            # 4. Generate images
+            img_gen = ImageGenerator(os.path.join(self.work_dir, "images"))
+            image_paths = img_gen.generate_batch(scenes)
 
-        # 5. Update status to "generating"
-        conn.execute(
-            "UPDATE videos SET status = ? WHERE id = ?",
-            ("generating", self.video_id),
-        )
-        conn.commit()
+            # 5. Update status to "generating"
+            conn.execute(
+                "UPDATE videos SET status = ? WHERE id = ?",
+                ("generating", self.video_id),
+            )
+            conn.commit()
 
-        # 6. Generate TTS audio
-        tts = TTSGenerator(os.path.join(self.work_dir, "audio"))
-        audio_path = tts.generate(narration)
+            # 6. Generate TTS audio
+            tts = TTSGenerator(os.path.join(self.work_dir, "audio"))
+            audio_path = tts.generate(narration)
 
-        # 7. Calculate durations
-        durations = Compositor.calculate_durations(210, len(scenes))
+            # 7. Calculate durations
+            durations = Compositor.calculate_durations(210, len(scenes))
 
-        # 8. Generate captions
-        captions_path = os.path.join(self.work_dir, "captions.ass")
-        cap = CaptionGenerator()
-        cap.write(scenes, durations, captions_path)
+            # 8. Generate captions
+            captions_path = os.path.join(self.work_dir, "captions.ass")
+            cap = CaptionGenerator()
+            cap.write(scenes, durations, captions_path)
 
-        # 9. Compose final video
-        comp = Compositor(os.path.join(self.work_dir, "video"))
-        video_path = comp.compose(image_paths, audio_path, captions_path, durations, self.video_id)
+            # 9. Compose final video
+            comp = Compositor(os.path.join(self.work_dir, "video"))
+            video_path = comp.compose(image_paths, audio_path, captions_path, durations, self.video_id)
 
-        # 10. Update DB with final video path and status
-        conn.execute(
-            "UPDATE videos SET video_path = ?, status = ? WHERE id = ?",
-            (video_path, "rendered", self.video_id),
-        )
-        conn.commit()
-        conn.close()
+            # 10. Update DB with final video path and status
+            conn.execute(
+                "UPDATE videos SET video_path = ?, status = ? WHERE id = ?",
+                (video_path, "rendered", self.video_id),
+            )
+            conn.commit()
 
-        logger.info("Video %s rendered at %s", self.video_id, video_path)
-        return video_path
+            logger.info("Video %s rendered at %s", self.video_id, video_path)
+            return video_path
+        finally:
+            conn.close()
 
 
 def main():
     """CLI entry point."""
     parser = argparse.ArgumentParser(description="Generate a video from a planned content row.")
-    parser.add_argument("--video-id", required=True, help="Video ID from the database")
+    parser.add_argument("--video-id", required=True, type=int, help="Video ID from the database")
     parser.add_argument("--db-path", required=True, help="Path to the SQLite database")
     parser.add_argument("--output-dir", required=True, help="Directory for output files")
     parser.add_argument("--ollama-host", default="http://localhost:11434", help="Ollama API host")

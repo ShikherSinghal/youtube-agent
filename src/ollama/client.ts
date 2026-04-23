@@ -44,10 +44,18 @@ export class OllamaClient {
     const systemPrompt = "You must respond with valid JSON only. No markdown, no code fences, no explanation.";
     const text = await this.generateText(tier, prompt, systemPrompt);
 
-    // Strip code fences if present
-    const cleaned = text.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
+    // Strip code fences if present (handle preamble text before fences)
+    let cleaned = text.trim();
+    const fenceMatch = cleaned.match(/```(?:json)?\s*\n([\s\S]*?)\n?```/i);
+    if (fenceMatch) {
+      cleaned = fenceMatch[1].trim();
+    }
 
-    return JSON.parse(cleaned) as T;
+    try {
+      return JSON.parse(cleaned) as T;
+    } catch (err) {
+      throw new Error(`Failed to parse LLM response as JSON: ${(err as Error).message}\nRaw response: ${text.slice(0, 500)}`);
+    }
   }
 
   async isHealthy(): Promise<boolean> {

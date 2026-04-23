@@ -66,11 +66,19 @@ export class Orchestrator {
   private generateOne(videoId: number): Promise<void> {
     const scriptPath = path.resolve("video-engine/generate.py");
     const dbPath = path.resolve("data/youtube-agent.db");
+    const outputDir = path.resolve("output");
 
     return new Promise<void>((resolve, reject) => {
       logger.info("Orchestrator", `Starting generation for video ${videoId}`);
 
-      const child = spawn("python", [scriptPath, "--video-id", String(videoId), "--db-path", dbPath]);
+      const child = spawn("python3", [
+        scriptPath,
+        "--video-id", String(videoId),
+        "--db-path", dbPath,
+        "--output-dir", outputDir,
+        "--ollama-host", this.config.ollama.host,
+        "--ollama-model", this.config.ollama.heavyModel,
+      ]);
 
       child.stdout.on("data", (data: Buffer) => {
         logger.info("Orchestrator", `[video-${videoId}] ${data.toString().trim()}`);

@@ -49,6 +49,10 @@ export class UploaderAgent {
   }
 
   private async uploadOne(video: VideoRow): Promise<string> {
+    if (!video.video_path) {
+      throw new Error(`Video ${video.id} has no video_path set`);
+    }
+
     const oauth2Client = new google.auth.OAuth2(
       this.credentials.clientId,
       this.credentials.clientSecret,
@@ -75,10 +79,14 @@ export class UploaderAgent {
         },
       },
       media: {
-        body: fs.createReadStream(video.video_path!),
+        body: fs.createReadStream(video.video_path),
       },
     });
 
-    return response.data.id!;
+    const youtubeId = response.data.id;
+    if (!youtubeId) {
+      throw new Error(`YouTube API did not return a video ID for video ${video.id}`);
+    }
+    return youtubeId;
   }
 }

@@ -193,4 +193,27 @@ describe("WatcherAgent", () => {
     expect(html).toContain("Bob");
     expect(html).toContain("Very informative");
   });
+
+  it("escapes HTML in digest to prevent XSS", () => {
+    const comments = [
+      {
+        id: 1,
+        video_id: 1,
+        youtube_comment_id: "c1",
+        author: '<script>alert("xss")</script>',
+        text: '<img src=x onerror="alert(1)">',
+        published_at: "2024-06-01T12:00:00Z",
+        notified: 0,
+        created_at: "2024-06-01T12:00:00Z",
+        title: "My Video",
+      },
+    ];
+
+    const agent = new WatcherAgent(db, config);
+    const html = agent.buildDigestHtml(comments);
+
+    expect(html).not.toContain("<script>");
+    expect(html).not.toContain("<img");
+    expect(html).toContain("&lt;script&gt;");
+  });
 });

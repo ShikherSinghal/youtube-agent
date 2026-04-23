@@ -22,12 +22,20 @@ class Compositor:
 
         Hook (first scene) = 15s, outro (last scene) = 15s,
         remaining time split evenly among middle scenes.
+        For 1 scene, the entire duration goes to that scene.
+        For 2 scenes, split evenly between hook and outro.
         """
+        if num_scenes <= 0:
+            return []
+        if num_scenes == 1:
+            return [total_duration]
+        if num_scenes == 2:
+            return [total_duration / 2, total_duration / 2]
         hook = 15.0
         outro = 15.0
         remaining = total_duration - hook - outro
         middle_count = num_scenes - 2
-        middle_dur = remaining / middle_count if middle_count > 0 else 0.0
+        middle_dur = remaining / middle_count
         return [hook] + [middle_dur] * middle_count + [outro]
 
     def compose(

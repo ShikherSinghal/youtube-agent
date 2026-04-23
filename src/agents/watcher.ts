@@ -14,6 +14,14 @@ export interface WatcherConfig {
   };
 }
 
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
 export class WatcherAgent {
   constructor(
     private db: Database,
@@ -29,7 +37,8 @@ export class WatcherAgent {
 
     const youtube = google.youtube({ version: "v3", auth });
     const videos = this.db.getUploadedVideos();
-    let totalNew = 0;
+
+    const countBefore = this.db.getUnnotifiedComments().length;
 
     for (const video of videos) {
       if (!video.youtube_id) continue;
@@ -52,11 +61,11 @@ export class WatcherAgent {
           text: snippet.textDisplay ?? "",
           publishedAt: snippet.publishedAt ?? new Date().toISOString(),
         });
-        totalNew++;
       }
     }
 
-    return totalNew;
+    const countAfter = this.db.getUnnotifiedComments().length;
+    return countAfter - countBefore;
   }
 
   async sendDigest(): Promise<boolean> {
@@ -102,11 +111,11 @@ export class WatcherAgent {
     html += `<p>${comments.length} new comment${comments.length !== 1 ? "s" : ""}</p>`;
 
     for (const [title, videoComments] of grouped) {
-      html += `<h2>${title}</h2>`;
+      html += `<h2>${escapeHtml(title)}</h2>`;
       html += `<ul>`;
       const displayed = videoComments.slice(0, 5);
       for (const c of displayed) {
-        html += `<li><strong>${c.author}</strong>: ${c.text}</li>`;
+        html += `<li><strong>${escapeHtml(c.author)}</strong>: ${escapeHtml(c.text)}</li>`;
       }
       if (videoComments.length > 5) {
         html += `<li><em>...and ${videoComments.length - 5} more</em></li>`;
