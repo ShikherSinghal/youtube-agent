@@ -36,7 +36,7 @@ class ScriptWriter:
             "stream": False,
         }
 
-        resp = requests.post(url, json=payload)
+        resp = requests.post(url, json=payload, timeout=300)
         if resp.status_code != 200:
             raise RuntimeError(f"Ollama request failed with status {resp.status_code}")
 
@@ -44,7 +44,14 @@ class ScriptWriter:
         return self._parse_json(content)
 
     def _parse_json(self, text: str) -> dict:
-        """Strip ```json code fences if present, then parse JSON."""
-        cleaned = re.sub(r"^```(?:json)?\s*\n?", "", text.strip())
-        cleaned = re.sub(r"\n?```\s*$", "", cleaned)
-        return json.loads(cleaned)
+        """Strip ```json code fences if present (even with preamble text), then parse JSON."""
+        cleaned = text.strip()
+        fence_match = re.search(r"```(?:json)?\s*\n([\s\S]*?)\n?```", cleaned, re.IGNORECASE)
+        if fence_match:
+            cleaned = fence_match.group(1).strip()
+        try:
+            return json.loads(cleaned)
+        except json.JSONDecodeError as e:
+            raise RuntimeError(
+                f"Failed to parse LLM response as JSON: {e}\nRaw response: {text[:500]}"
+            ) from e

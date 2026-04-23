@@ -23,14 +23,14 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
 def _format_time(seconds: float) -> str:
     """Format seconds as H:MM:SS.CC (centiseconds)."""
-    h = int(seconds // 3600)
-    m = int((seconds % 3600) // 60)
-    s = seconds % 60
-    whole = int(s)
-    cs = int(round((s - whole) * 100))
-    if cs >= 100:
-        whole += 1
-        cs = 0
+    # Round to centiseconds first to avoid overflow in individual components
+    total_cs = int(round(seconds * 100))
+    h = total_cs // 360000
+    total_cs %= 360000
+    m = total_cs // 6000
+    total_cs %= 6000
+    whole = total_cs // 100
+    cs = total_cs % 100
     return f"{h}:{m:02d}:{whole:02d}.{cs:02d}"
 
 

@@ -73,4 +73,16 @@ describe("loadConfig", () => {
     expect(config.watcher.pollIntervalMs).toBe(1800000);
     expect(config.watcher.digestHour).toBe(9);
   });
+
+  it("throws on invalid integer env vars", () => {
+    process.env.YOUTUBE_CLIENT_ID = "x";
+    process.env.YOUTUBE_CLIENT_SECRET = "x";
+    process.env.YOUTUBE_REFRESH_TOKEN = "x";
+    process.env.GMAIL_USER = "x";
+    process.env.GMAIL_APP_PASSWORD = "x";
+    process.env.NICHES = "tech";
+    process.env.VIDEO_WORKERS = "abc";
+
+    expect(() => loadConfig()).toThrow('Invalid integer for env var VIDEO_WORKERS: "abc"');
+  });
 });

@@ -1,6 +1,12 @@
 import json
+import sys
 import unittest
+from types import ModuleType
 from unittest.mock import patch, MagicMock
+
+requests_stub = ModuleType("requests")
+requests_stub.post = MagicMock()
+sys.modules["requests"] = requests_stub
 
 from scripts.writer import ScriptWriter
 
@@ -55,6 +61,23 @@ class TestScriptWriter(unittest.TestCase):
         scenes = _make_scenes()
         inner = json.dumps({"narration": "Narration here.", "scenes": scenes})
         fenced = f"```json\n{inner}\n```"
+        mock_post.return_value = _mock_response(
+            {"message": {"content": fenced}},
+            status_code=200,
+        )
+
+        result = self.writer.generate(title="AI Tools", hook="Listen up!", niche="ai")
+
+        self.assertEqual(len(result["scenes"]), 8)
+        self.assertEqual(result["narration"], "Narration here.")
+        mock_post.assert_called_once()
+        self.assertEqual(mock_post.call_args.kwargs["timeout"], 300)
+
+    @patch("scripts.writer.requests.post")
+    def test_handles_code_fenced_response_with_preamble(self, mock_post):
+        scenes = _make_scenes()
+        inner = json.dumps({"narration": "Narration here.", "scenes": scenes})
+        fenced = f"Here is the JSON:\n```json\n{inner}\n```"
         mock_post.return_value = _mock_response(
             {"message": {"content": fenced}},
             status_code=200,

@@ -1,7 +1,7 @@
 import os
 import unittest
 
-from scripts.captions import CaptionGenerator
+from scripts.captions import CaptionGenerator, _format_time
 
 
 class TestCaptionGenerator(unittest.TestCase):
@@ -68,6 +68,9 @@ class TestCaptionGenerator(unittest.TestCase):
 
         dialogue_lines = [l for l in result.splitlines() if l.startswith("Dialogue:")]
         self.assertGreater(len(dialogue_lines), 1, "Long text should produce multiple Dialogue lines")
+
+    def test_format_time_rolls_over_minute_boundary(self):
+        self.assertEqual(_format_time(59.995), "0:01:00.00")
 
 
 if __name__ == "__main__":

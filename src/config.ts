@@ -35,6 +35,15 @@ function optionalEnv(key: string, fallback: string): string {
   return process.env[key] || fallback;
 }
 
+function parseIntEnv(key: string, fallback: string): number {
+  const raw = optionalEnv(key, fallback);
+  const parsed = parseInt(raw, 10);
+  if (isNaN(parsed)) {
+    throw new Error(`Invalid integer for env var ${key}: "${raw}"`);
+  }
+  return parsed;
+}
+
 export function loadConfig(): Config {
   return {
     youtube: {
@@ -53,13 +62,13 @@ export function loadConfig(): Config {
       lightModel: optionalEnv("OLLAMA_MODEL_LIGHT", "qwen2.5:7b"),
     },
     video: {
-      durationSecs: parseInt(optionalEnv("VIDEO_DURATION_SECS", "210"), 10),
-      workers: parseInt(optionalEnv("VIDEO_WORKERS", "2"), 10),
-      imagesPerVideo: parseInt(optionalEnv("IMAGES_PER_VIDEO", "8"), 10),
+      durationSecs: parseIntEnv("VIDEO_DURATION_SECS", "210"),
+      workers: parseIntEnv("VIDEO_WORKERS", "2"),
+      imagesPerVideo: parseIntEnv("IMAGES_PER_VIDEO", "8"),
     },
     watcher: {
-      pollIntervalMs: parseInt(optionalEnv("COMMENT_POLL_INTERVAL_MS", "1800000"), 10),
-      digestHour: parseInt(optionalEnv("DIGEST_HOUR", "9"), 10),
+      pollIntervalMs: parseIntEnv("COMMENT_POLL_INTERVAL_MS", "1800000"),
+      digestHour: parseIntEnv("DIGEST_HOUR", "9"),
     },
   };
 }

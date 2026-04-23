@@ -126,10 +126,10 @@ export class WatcherAgent {
     return html;
   }
 
-  async startWatchLoop(
+  startWatchLoop(
     pollIntervalMs: number,
     digestHour: number
-  ): Promise<void> {
+  ): Promise<never> {
     let lastDigestDate = "";
 
     const tick = async () => {
@@ -157,7 +157,12 @@ export class WatcherAgent {
       }
     };
 
-    await tick();
-    setInterval(tick, pollIntervalMs);
+    // Run first tick immediately, then poll on interval.
+    // Return a promise that never resolves to keep the process alive
+    // and prevent the caller from closing the DB.
+    return new Promise((_, __) => {
+      tick();
+      setInterval(tick, pollIntervalMs);
+    });
   }
 }

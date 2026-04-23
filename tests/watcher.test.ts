@@ -85,8 +85,13 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   db.close();
   if (existsSync(TEST_DB)) unlinkSync(TEST_DB);
+  for (const suffix of ["-wal", "-shm"]) {
+    const p = TEST_DB + suffix;
+    if (existsSync(p)) unlinkSync(p);
+  }
 });
 
 describe("WatcherAgent", () => {
@@ -215,5 +220,22 @@ describe("WatcherAgent", () => {
     expect(html).not.toContain("<script>");
     expect(html).not.toContain("<img");
     expect(html).toContain("&lt;script&gt;");
+  });
+
+  it("keeps the watch loop alive across interval ticks", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2024, 5, 1, 8, 0, 0));
+
+    const agent = new WatcherAgent(db, config);
+    const pollSpy = vi.spyOn(agent, "pollComments").mockResolvedValue(0);
+    const digestSpy = vi.spyOn(agent, "sendDigest").mockResolvedValue(false);
+    const settled = vi.fn();
+
+    agent.startWatchLoop(1_000, 9).then(settled, settled);
+    await vi.advanceTimersByTimeAsync(2_500);
+
+    expect(pollSpy).toHaveBeenCalledTimes(3);
+    expect(digestSpy).not.toHaveBeenCalled();
+    expect(settled).not.toHaveBeenCalled();
   });
 });
