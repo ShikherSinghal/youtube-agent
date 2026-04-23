@@ -1,0 +1,9 @@
+edge-tts>=6.1.0
+Pillow>=10.0.0
+requests>=2.31.0
+moviepy>=1.0.3
+ffmpeg-python>=0.2.0
+ollama>=0.3.0
+diffusers>=0.27.0
+torch --index-url https://download.pytorch.org/whl/cpu
+accelerate>=0.27.0
