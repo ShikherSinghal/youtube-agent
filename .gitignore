@@ -1,0 +1,8 @@
+.env
+data/
+output/
+node_modules/
+dist/
+video-engine/__pycache__/
+video-engine/.venv/
+.superpowers/
