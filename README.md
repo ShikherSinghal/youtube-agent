@@ -42,23 +42,34 @@ Automated YouTube channel manager that generates a 30-day content plan, creates 
 
 - **Node.js** >= 18
 - **Python** >= 3.10
-- **FFmpeg** — `brew install ffmpeg`
+- **FFmpeg** — macOS: `brew install ffmpeg`; Windows: `winget install Gyan.FFmpeg`
 - **Ollama** — [ollama.com](https://ollama.com)
 
 ## Setup
+
+macOS, Linux, or WSL:
 
 ```bash
 # Clone and setup
 git clone https://github.com/ShikherSinghal/youtube-agent.git
 cd youtube-agent
 bash scripts/setup.sh
+```
+
+Windows PowerShell:
+
+```powershell
+# Clone and setup
+git clone https://github.com/ShikherSinghal/youtube-agent.git
+cd youtube-agent
+powershell -ExecutionPolicy Bypass -File .\scripts\setup.ps1
 
 # Pull Ollama models
 ollama pull qwen2.5:14b
 ollama pull qwen2.5:7b
 
 # Fill in credentials
-nano .env
+notepad .env
 
 # Build
 npm run build

@@ -10,8 +10,11 @@
     "doc": "docs"
   },
   "scripts": {
+    "agent": "node dist/index.js",
+    "auth:youtube": "node scripts/youtube-oauth.mjs",
     "build": "tsc",
     "dev": "tsc --watch",
+    "preagent": "npm run build",
     "start": "node dist/index.js",
     "test": "vitest run",
     "test:watch": "vitest"

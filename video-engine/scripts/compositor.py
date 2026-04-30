@@ -31,12 +31,42 @@ class Compositor:
             return [total_duration]
         if num_scenes == 2:
             return [total_duration / 2, total_duration / 2]
+        if total_duration <= 30:
+            return [total_duration / num_scenes] * num_scenes
         hook = 15.0
         outro = 15.0
         remaining = total_duration - hook - outro
         middle_count = num_scenes - 2
         middle_dur = remaining / middle_count
         return [hook] + [middle_dur] * middle_count + [outro]
+
+    @staticmethod
+    def calculate_text_durations(total_duration: float, scenes: list) -> list:
+        """Allocate scene durations in proportion to spoken word counts."""
+        if not scenes:
+            return []
+
+        word_counts = [
+            max(1, len(scene.get("text", "").split()))
+            for scene in scenes
+        ]
+        total_words = sum(word_counts)
+        if total_words <= 0:
+            return Compositor.calculate_durations(total_duration, len(scenes))
+
+        return [
+            total_duration * (word_count / total_words)
+            for word_count in word_counts
+        ]
+
+    @staticmethod
+    def get_audio_duration(audio_path: str) -> float:
+        """Return the audio duration in seconds."""
+        audio = AudioFileClip(audio_path)
+        try:
+            return float(audio.duration or 0)
+        finally:
+            audio.close()
 
     def compose(
         self,
@@ -108,8 +138,16 @@ class Compositor:
             [
                 "ffmpeg", "-y",
                 "-i", temp_path,
-                "-vf", f"ass={captions_path}",
-                "-c:a", "copy",
+                "-vf", self._build_ass_filter(captions_path),
+                "-map", "0:v:0",
+                "-map", "0:a:0",
+                "-c:v", "libx264",
+                "-c:a", "aac",
+                "-b:a", "192k",
+                "-ar", "48000",
+                "-ac", "2",
+                "-af", "loudnorm=I=-16:TP=-1.5:LRA=11",
+                "-movflags", "+faststart",
                 output_path,
             ],
             check=True,
@@ -120,3 +158,12 @@ class Compositor:
             os.remove(temp_path)
 
         return output_path
+
+    @staticmethod
+    def _build_ass_filter(captions_path: str) -> str:
+        """Build an ffmpeg `ass` filter string that works with Windows paths."""
+        normalized_path = os.path.abspath(captions_path).replace("\\", "/")
+        if len(normalized_path) >= 2 and normalized_path[1] == ":":
+            normalized_path = normalized_path[0] + r"\:" + normalized_path[2:]
+        escaped_path = normalized_path.replace("'", r"\'")
+        return f"ass=filename='{escaped_path}'"

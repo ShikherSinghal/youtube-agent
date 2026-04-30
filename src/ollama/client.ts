@@ -33,7 +33,9 @@ export class OllamaClient {
     });
 
     if (!response.ok) {
-      throw new Error(`Ollama request failed: ${response.status}`);
+      const errorText = await response.text().catch(() => "");
+      const detail = errorText ? `: ${errorText.slice(0, 500)}` : "";
+      throw new Error(`Ollama request failed: ${response.status}${detail}`);
     }
 
     const data = await response.json();

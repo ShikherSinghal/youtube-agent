@@ -1,5 +1,6 @@
 """Tests for the video compositor module."""
 
+import os
 import sys
 from unittest.mock import patch, MagicMock
 import pytest
@@ -79,6 +80,10 @@ class TestCompositor:
         # Result should end with .mp4
         assert result.endswith(".mp4")
 
+        filter_arg = mock_subprocess.run.call_args[0][0][5]
+        assert filter_arg.startswith("ass=filename='")
+        assert filter_arg.endswith("'")
+
     def test_calculates_scene_durations(self):
         """calculate_durations should return correct durations for 8 scenes totalling ~210s."""
         durations = Compositor.calculate_durations(total_duration=210.0, num_scenes=8)
@@ -94,3 +99,38 @@ class TestCompositor:
 
         # Total should be ~210s
         assert sum(durations) == pytest.approx(210.0, abs=0.1)
+
+    def test_short_audio_durations_are_split_evenly(self):
+        durations = Compositor.calculate_durations(total_duration=8.0, num_scenes=8)
+
+        assert durations == [1.0] * 8
+
+    def test_calculates_text_weighted_durations(self):
+        scenes = [
+            {"text": "one two"},
+            {"text": "three four five six"},
+        ]
+
+        durations = Compositor.calculate_text_durations(12.0, scenes)
+
+        assert durations == pytest.approx([4.0, 8.0])
+
+    @patch("scripts.compositor.AudioFileClip")
+    def test_get_audio_duration_closes_clip(self, mock_audio_cls):
+        mock_audio = MagicMock()
+        mock_audio.duration = 42.5
+        mock_audio_cls.return_value = mock_audio
+
+        assert Compositor.get_audio_duration("/tmp/audio.mp3") == 42.5
+        mock_audio.close.assert_called_once()
+
+    @pytest.mark.skipif(os.name != "nt", reason="Windows-only ffmpeg path escaping")
+    def test_builds_windows_safe_ass_filter(self):
+        filter_arg = Compositor._build_ass_filter(
+            r"C:\Users\singh\OneDrive\Documents\Projects\youtube-agent\output\work_1\captions.ass"
+        )
+
+        assert filter_arg == (
+            "ass=filename='C\\:/Users/singh/OneDrive/Documents/Projects/"
+            "youtube-agent/output/work_1/captions.ass'"
+        )

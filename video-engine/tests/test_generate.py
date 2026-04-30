@@ -41,15 +41,18 @@ def fake_db(tmp_path):
 @patch("generate.CaptionGenerator")
 @patch("generate.TTSGenerator")
 @patch("generate.ImageGenerator")
+@patch("generate.shutil.copy2")
 @patch("generate.ScriptWriter")
 def test_full_pipeline(
-    MockWriter, MockImageGen, MockTTS, MockCaption, MockCompositor,
+    MockWriter, mock_copy2, MockImageGen, MockTTS, MockCaption, MockCompositor,
     fake_db, tmp_path,
 ):
     """Mock every external dependency and verify the full pipeline calls."""
     # --- configure mocks ---
     script_data = {
-        "narration": "Full narration text for the video.",
+        "narration": (
+            "Hook text Scene 1 Scene 2 Scene 3 Scene 4 Scene 5 Scene 6 Outro text"
+        ),
         "scenes": [
             {"scene": "hook", "text": "Hook text", "image_prompt": "hook img"},
             {"scene": "scene_1", "text": "Scene 1", "image_prompt": "s1 img"},
@@ -71,7 +74,8 @@ def test_full_pipeline(
 
     MockCaption.return_value.write.return_value = "/captions/captions.ass"
 
-    MockCompositor.calculate_durations.return_value = [15.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 15.0]
+    MockCompositor.get_audio_duration.return_value = 210.0
+    MockCompositor.calculate_text_durations.return_value = [15.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 15.0]
     MockCompositor.return_value.compose.return_value = "/output/vid_1.mp4"
 
     # --- run pipeline ---
@@ -90,7 +94,7 @@ def test_full_pipeline(
 
     MockImageGen.return_value.generate_batch.assert_called_once_with(script_data["scenes"])
 
-    MockTTS.return_value.generate.assert_called_once_with("Full narration text for the video.")
+    MockTTS.return_value.generate.assert_called_once_with(script_data["narration"])
 
     MockCaption.return_value.write.assert_called_once_with(
         script_data["scenes"],
@@ -105,11 +109,36 @@ def test_full_pipeline(
         [15.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 15.0],
         "vid_1",
     )
+    mock_copy2.assert_called_once()
 
     # Verify DB was updated
     conn = sqlite3.connect(fake_db)
     row = conn.execute("SELECT status, video_path, script FROM videos WHERE id = 'vid_1'").fetchone()
     conn.close()
     assert row[0] == "rendered"
-    assert row[1] == "/output/vid_1.mp4"
-    assert row[2] == "Full narration text for the video."
+    assert row[1].endswith("videos/vid_1.mp4") or row[1].endswith(r"videos\vid_1.mp4")
+    assert row[2] == script_data["narration"]
+
+
+def test_select_narration_falls_back_to_scene_text():
+    scenes = [
+        {"text": "This is the actual first spoken scene."},
+        {"text": "This is the actual second spoken scene with more detail."},
+    ]
+
+    result = VideoGenerator._select_narration("AI in 2026", scenes)
+
+    assert result == (
+        "This is the actual first spoken scene. "
+        "This is the actual second spoken scene with more detail."
+    )
+
+
+def test_select_narration_keeps_complete_narration():
+    scenes = [
+        {"text": "Scene one words for the video."},
+        {"text": "Scene two words for the video."},
+    ]
+    narration = "Scene one words for the video. Scene two words for the video."
+
+    assert VideoGenerator._select_narration(narration, scenes) == narration

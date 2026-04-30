@@ -1,4 +1,5 @@
 import { spawn } from "child_process";
+import { existsSync } from "fs";
 import path from "path";
 import { Database } from "./db.js";
 import { OllamaClient } from "./ollama/client.js";
@@ -67,18 +68,27 @@ export class Orchestrator {
     const scriptPath = path.resolve("video-engine/generate.py");
     const dbPath = path.resolve("data/youtube-agent.db");
     const outputDir = path.resolve("output");
+    const python = this.getPythonInvocation();
 
     return new Promise<void>((resolve, reject) => {
       logger.info("Orchestrator", `Starting generation for video ${videoId}`);
+      logger.info("Orchestrator", `Using Python: ${python.command} ${python.args.join(" ")}`.trim());
 
-      const child = spawn("python3", [
+      const child = spawn(python.command, [
+        ...python.args,
         scriptPath,
         "--video-id", String(videoId),
         "--db-path", dbPath,
         "--output-dir", outputDir,
         "--ollama-host", this.config.ollama.host,
         "--ollama-model", this.config.ollama.heavyModel,
-      ]);
+        "--duration-secs", String(this.config.video.durationSecs),
+      ], {
+        env: {
+          ...process.env,
+          PYTHONUNBUFFERED: "1",
+        },
+      });
 
       child.stdout.on("data", (data: Buffer) => {
         logger.info("Orchestrator", `[video-${videoId}] ${data.toString().trim()}`);
@@ -88,12 +98,13 @@ export class Orchestrator {
         logger.warn("Orchestrator", `[video-${videoId}] ${data.toString().trim()}`);
       });
 
-      child.on("close", (code) => {
+      child.on("close", (code, signal) => {
         if (code === 0) {
           logger.info("Orchestrator", `Video ${videoId} generation complete.`);
           resolve();
         } else {
-          reject(new Error(`Video ${videoId} generation failed with exit code ${code}`));
+          const reason = signal ? `signal ${signal}` : `exit code ${code}`;
+          reject(new Error(`Video ${videoId} generation failed with ${reason}`));
         }
       });
 
@@ -101,6 +112,28 @@ export class Orchestrator {
         reject(new Error(`Failed to spawn generator for video ${videoId}: ${err.message}`));
       });
     });
+  }
+
+  private getPythonInvocation(): { command: string; args: string[] } {
+    if (process.env.PYTHON) {
+      return { command: process.env.PYTHON, args: [] };
+    }
+
+    const windowsVenv = path.resolve("video-engine/.venv/Scripts/python.exe");
+    if (existsSync(windowsVenv)) {
+      return { command: windowsVenv, args: [] };
+    }
+
+    const unixVenv = path.resolve("video-engine/.venv/bin/python");
+    if (existsSync(unixVenv)) {
+      return { command: unixVenv, args: [] };
+    }
+
+    if (process.platform === "win32") {
+      return { command: "py", args: ["-3"] };
+    }
+
+    return { command: "python3", args: [] };
   }
 
   async upload(): Promise<void> {

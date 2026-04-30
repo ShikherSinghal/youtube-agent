@@ -69,6 +69,23 @@ class TestCaptionGenerator(unittest.TestCase):
         dialogue_lines = [l for l in result.splitlines() if l.startswith("Dialogue:")]
         self.assertGreater(len(dialogue_lines), 1, "Long text should produce multiple Dialogue lines")
 
+    def test_chunk_timing_uses_word_counts(self):
+        scenes = [
+            {
+                "text": (
+                    "one two three four five six seven eight nine ten eleven "
+                    "twelve thirteen fourteen fifteen"
+                )
+            }
+        ]
+        durations = [15.0]
+
+        result = self.gen.generate(scenes, durations)
+
+        dialogue_lines = [l for l in result.splitlines() if l.startswith("Dialogue:")]
+        self.assertEqual(len(dialogue_lines), 2)
+        self.assertIn("0:00:11.00", dialogue_lines[0])
+
     def test_format_time_rolls_over_minute_boundary(self):
         self.assertEqual(_format_time(59.995), "0:01:00.00")
 

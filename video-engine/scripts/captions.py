@@ -73,10 +73,12 @@ class CaptionGenerator:
         for scene, duration in zip(scenes, durations):
             text = scene["text"]
             chunks = _split_text(text)
-            chunk_dur = duration / len(chunks)
+            chunk_word_counts = [max(1, len(chunk.split())) for chunk in chunks]
+            total_chunk_words = sum(chunk_word_counts)
 
-            for chunk in chunks:
+            for chunk, word_count in zip(chunks, chunk_word_counts):
                 start = _format_time(cursor)
+                chunk_dur = duration * (word_count / total_chunk_words)
                 cursor += chunk_dur
                 end = _format_time(cursor)
                 lines.append(

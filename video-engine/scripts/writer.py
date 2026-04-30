@@ -33,12 +33,15 @@ class ScriptWriter:
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
             ],
+            "format": "json",
             "stream": False,
         }
 
         resp = requests.post(url, json=payload, timeout=300)
         if resp.status_code != 200:
-            raise RuntimeError(f"Ollama request failed with status {resp.status_code}")
+            raise RuntimeError(
+                f"Ollama request failed with status {resp.status_code}: {resp.text[:500]}"
+            )
 
         content = resp.json()["message"]["content"]
         return self._parse_json(content)

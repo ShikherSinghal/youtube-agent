@@ -1,6 +1,7 @@
 import os
 import pytest
 from unittest.mock import patch, MagicMock
+from PIL import Image
 from scripts.images import ImageGenerator
 
 
@@ -73,3 +74,34 @@ class TestImageGenerator:
 
         assert len(paths) == 3
         assert all(p.endswith(".png") for p in paths)
+
+    @patch("scripts.images.time.sleep")
+    @patch.object(ImageGenerator, "_generate_stable_diffusion")
+    @patch("scripts.images.requests.get")
+    def test_disables_pollinations_after_full_failure(
+        self, mock_get, mock_sd, mock_sleep, generator
+    ):
+        mock_get.side_effect = Exception("timeout")
+        mock_sd.side_effect = lambda prompt, path: path
+
+        generator.generate_image("prompt one", "scene_1")
+        generator.generate_image("prompt two", "scene_2")
+
+        assert mock_get.call_count == generator.MAX_RETRIES
+        assert mock_sd.call_count == 2
+
+    @patch("scripts.images.time.sleep")
+    @patch.object(ImageGenerator, "_generate_stable_diffusion", side_effect=RuntimeError("missing deps"))
+    @patch("scripts.images.requests.get")
+    def test_falls_back_to_placeholder_when_sd_unavailable(
+        self, mock_get, mock_sd, mock_sleep, generator
+    ):
+        mock_get.side_effect = Exception("timeout")
+
+        path = generator.generate_image("a futuristic city skyline at sunrise", "scene_3")
+
+        assert os.path.isfile(path)
+        with Image.open(path) as image:
+            assert image.size == generator.IMAGE_SIZE
+        assert mock_get.call_count == generator.MAX_RETRIES
+        assert mock_sd.call_count == 1
